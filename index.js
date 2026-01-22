@@ -808,3 +808,4 @@ client.once('clientReady', () => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
