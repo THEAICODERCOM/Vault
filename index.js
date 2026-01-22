@@ -1,7 +1,9 @@
 require('dotenv').config();
 console.log('🚀 Starting VaultQuest Bot...');
 const { Client, GatewayIntentBits, Collection, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
+console.log('🔍 Debug: About to require ./database');
 const { getUser, db, transaction } = require('./database');
+console.log('🔍 Debug: Successfully required ./database');
 const { formatTime, calculateSuccess } = require('./utils');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
