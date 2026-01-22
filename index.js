@@ -97,7 +97,11 @@ const commands = [
             option.setName('type')
                 .setDescription('Type of leaderboard')
                 .setRequired(true)
-                .setAutocomplete(true)),
+                .addChoices(
+                    { name: '💰 Wealth (Vault)', value: 'money' },
+                    { name: '🏢 Businesses Owned', value: 'business' },
+                    { name: '🚩 Faction Wealth', value: 'faction' }
+                )),
 
     // /profile
     new SlashCommandBuilder()
@@ -131,16 +135,6 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 client.on('interactionCreate', async interaction => {
     if (interaction.isAutocomplete()) {
-        if (interaction.commandName === 'leaderboard') {
-            const focusedValue = interaction.options.getFocused();
-            const choices = [
-                { name: '💰 Wealth (Vault)', value: 'money' },
-                { name: '🏢 Businesses Owned', value: 'business' },
-                { name: '🚩 Faction Wealth', value: 'faction' }
-            ];
-            const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
-            await interaction.respond(filtered);
-        }
         return;
     }
 
@@ -754,3 +748,4 @@ client.once('ready', () => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
