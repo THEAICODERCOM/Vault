@@ -130,33 +130,33 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 })();
 
 client.on('interactionCreate', async interaction => {
-    if (interaction.isAutocomplete()) {
-        if (interaction.commandName === 'leaderboard') {
-            const focusedValue = interaction.options.getFocused();
-            const choices = [
-                { name: '💰 Wealth (Vault)', value: 'money' },
-                { name: '🏢 Businesses Owned', value: 'business' },
-                { name: '🚩 Faction Wealth', value: 'faction' }
-            ];
-            const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
-            await interaction.respond(filtered);
+    try {
+        if (interaction.isAutocomplete()) {
+            if (interaction.commandName === 'leaderboard') {
+                const focusedValue = interaction.options.getFocused();
+                const choices = [
+                    { name: '💰 Wealth (Vault)', value: 'money' },
+                    { name: '🏢 Businesses Owned', value: 'business' },
+                    { name: '🚩 Faction Wealth', value: 'faction' }
+                ];
+                const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
+                await interaction.respond(filtered);
+            }
+            return;
         }
-        return;
-    }
 
-    if (!interaction.isChatInputCommand()) return;
+        if (!interaction.isChatInputCommand()) return;
 
-    // DEFER ALL REPLIES TO PREVENT "UNKNOWN INTERACTION" ERRORS
-    // This gives the bot 15 minutes to respond instead of 3 seconds.
-    // We only defer for commands that might take time or have complex logic.
-    const deferOptions = { ephemeral: ['shop', 'inventory'].includes(interaction.commandName) };
-    if (!['work', 'daily', 'vault', 'upgrade', 'business', 'faction', 'heist', 'give', 'help'].includes(interaction.commandName)) {
-        await interaction.deferReply(deferOptions);
-    }
+        // DEFER ALL REPLIES TO PREVENT "UNKNOWN INTERACTION" ERRORS
+        // This gives the bot 15 minutes to respond instead of 3 seconds.
+        const deferOptions = { ephemeral: ['shop', 'inventory'].includes(interaction.commandName) };
+        if (!['work', 'daily', 'vault', 'upgrade', 'business', 'faction', 'heist', 'give', 'help'].includes(interaction.commandName)) {
+            await interaction.deferReply(deferOptions);
+        }
 
-    const user = getUser(interaction.user.id);
+        const user = getUser(interaction.user.id);
 
-    if (interaction.commandName === 'profile') {
+        if (interaction.commandName === 'profile') {
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const dbUser = getUser(targetUser.id);
         const isInked = dbUser.ink_bomb_until > Date.now();
@@ -691,7 +691,21 @@ client.on('interactionCreate', async interaction => {
             
             await interaction.reply({ embeds: [embed] });
        }
-   });
+    } catch (error) {
+        console.error('❌ Interaction Error:', error);
+        const errorMsg = { content: '⚠️ An error occurred while processing this command. The database might be busy, please try again in a moment.', ephemeral: true };
+        
+        try {
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply(errorMsg);
+            } else {
+                await interaction.reply(errorMsg);
+            }
+        } catch (e) {
+            console.error('Failed to send error response:', e);
+        }
+    }
+});
 
    client.on('interactionCreate', async interaction => {
     if (interaction.isStringSelectMenu() && interaction.customId === 'shop_select') {
@@ -762,6 +776,3 @@ client.once('ready', () => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
-
-
-
