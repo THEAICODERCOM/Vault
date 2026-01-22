@@ -97,11 +97,7 @@ const commands = [
             option.setName('type')
                 .setDescription('Type of leaderboard')
                 .setRequired(true)
-                .addChoices(
-                    { name: '💰 Wealth (Vault)', value: 'money' },
-                    { name: '🏢 Businesses Owned', value: 'business' },
-                    { name: '🚩 Faction Wealth', value: 'faction' }
-                )),
+                .setAutocomplete(true)),
 
     // /profile
     new SlashCommandBuilder()
@@ -135,10 +131,28 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 client.on('interactionCreate', async interaction => {
     if (interaction.isAutocomplete()) {
+        if (interaction.commandName === 'leaderboard') {
+            const focusedValue = interaction.options.getFocused();
+            const choices = [
+                { name: '💰 Wealth (Vault)', value: 'money' },
+                { name: '🏢 Businesses Owned', value: 'business' },
+                { name: '🚩 Faction Wealth', value: 'faction' }
+            ];
+            const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
+            await interaction.respond(filtered);
+        }
         return;
     }
 
     if (!interaction.isChatInputCommand()) return;
+
+    // DEFER ALL REPLIES TO PREVENT "UNKNOWN INTERACTION" ERRORS
+    // This gives the bot 15 minutes to respond instead of 3 seconds.
+    // We only defer for commands that might take time or have complex logic.
+    const deferOptions = { ephemeral: ['shop', 'inventory'].includes(interaction.commandName) };
+    if (!['work', 'daily', 'vault', 'upgrade', 'business', 'faction', 'heist', 'give', 'help'].includes(interaction.commandName)) {
+        await interaction.deferReply(deferOptions);
+    }
 
     const user = getUser(interaction.user.id);
 
@@ -173,7 +187,7 @@ client.on('interactionCreate', async interaction => {
             embed.setFooter({ text: `⚠️ This user is currently MARKED by an ink bomb!` });
         }
 
-        await interaction.reply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
     }
 
     if (interaction.commandName === 'balance') {
@@ -192,7 +206,7 @@ client.on('interactionCreate', async interaction => {
             embed.setFooter({ text: `This user is marked by an ink bomb! Ends in ${formatTime(dbUser.ink_bomb_until - Date.now())}` });
         }
         
-        await interaction.reply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
     }
 
     if (interaction.commandName === 'work') {
@@ -748,5 +762,6 @@ client.once('ready', () => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
 
 
