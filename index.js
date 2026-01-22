@@ -92,7 +92,18 @@ const commands = [
     // /leaderboard
     new SlashCommandBuilder()
         .setName('leaderboard')
-        .setDescription('See the richest players'),
+        .setDescription('See the top players and factions')
+        .addStringOption(option => 
+            option.setName('type')
+                .setDescription('Type of leaderboard')
+                .setRequired(true)
+                .setAutocomplete(true)),
+
+    // /profile
+    new SlashCommandBuilder()
+        .setName('profile')
+        .setDescription('View detailed stats for a user')
+        .addUserOption(option => option.setName('user').setDescription('The user to view').setRequired(false)),
 
     // /help
     new SlashCommandBuilder()
@@ -119,9 +130,57 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 })();
 
 client.on('interactionCreate', async interaction => {
+    if (interaction.isAutocomplete()) {
+        if (interaction.commandName === 'leaderboard') {
+            const focusedValue = interaction.options.getFocused();
+            const choices = [
+                { name: '💰 Wealth (Vault)', value: 'money' },
+                { name: '🏢 Businesses Owned', value: 'business' },
+                { name: '🚩 Faction Wealth', value: 'faction' }
+            ];
+            const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
+            await interaction.respond(filtered);
+        }
+        return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const user = getUser(interaction.user.id);
+
+    if (interaction.commandName === 'profile') {
+        const targetUser = interaction.options.getUser('user') || interaction.user;
+        const dbUser = getUser(targetUser.id);
+        const isInked = dbUser.ink_bomb_until > Date.now();
+        
+        const security = dbUser.security_level;
+        const baseProb = Math.max(0.1, 0.7 - (security * 0.1));
+        const heistChance = (baseProb * 100).toFixed(1);
+
+        const inv = db.prepare('SELECT item_id, COUNT(*) as count FROM inventory WHERE user_id = ? GROUP BY item_id').all(dbUser.id);
+        const itemString = inv.map(i => `${i.item_id.replace('_', ' ').toUpperCase()} (x${i.count})`).join(', ') || 'None';
+
+        const bizCount = db.prepare('SELECT COUNT(*) as count FROM businesses WHERE user_id = ?').get(dbUser.id).count;
+
+        const embed = new EmbedBuilder()
+            .setTitle(`👤 Profile: ${targetUser.username}`)
+            .setThumbnail(targetUser.displayAvatarURL())
+            .addFields(
+                { name: '🏦 Vault Balance', value: `🪙 ${dbUser.vault.toLocaleString()} / ${dbUser.vault_capacity.toLocaleString()}`, inline: true },
+                { name: '🛡️ Security Level', value: `Lvl ${dbUser.security_level}`, inline: true },
+                { name: '🕵️ Heist Difficulty', value: `${heistChance}% chance for attackers`, inline: true },
+                { name: '🏢 Businesses', value: `${bizCount} owned`, inline: true },
+                { name: '🚩 Faction', value: dbUser.faction_id || 'None', inline: true },
+                { name: '🎒 Inventory', value: itemString }
+            )
+            .setColor(isInked ? 'Red' : 'Blue');
+
+        if (isInked) {
+            embed.setFooter({ text: `⚠️ This user is currently MARKED by an ink bomb!` });
+        }
+
+        await interaction.reply({ embeds: [embed] });
+    }
 
     if (interaction.commandName === 'balance') {
         const targetUser = interaction.options.getUser('user') || interaction.user;
@@ -576,27 +635,34 @@ client.on('interactionCreate', async interaction => {
        }
 
     if (interaction.commandName === 'leaderboard') {
-        // Defer reply because fetching users can be slow
         await interaction.deferReply();
-        
-        const topUsers = db.prepare('SELECT id, vault FROM users ORDER BY vault DESC LIMIT 10').all();
-        
-        const embed = new EmbedBuilder()
-            .setTitle('🏆 Global Wealth Leaderboard')
-            .setColor('Gold');
+        const type = interaction.options.getString('type');
+        const embed = new EmbedBuilder().setColor('Gold');
+        let leaderboardList = [];
 
-        const leaderboardList = await Promise.all(topUsers.map(async (u, index) => {
-            let username = 'Unknown';
-            try {
-                const discordUser = await client.users.fetch(u.id);
-                username = discordUser.username;
-            } catch (e) {
-                username = `User(${u.id.substring(0, 5)}...)`;
-            }
-            return `${index + 1}. **${username}** - 🏦 ${u.vault.toLocaleString()}`;
-        }));
+        if (type === 'money') {
+            const topUsers = db.prepare('SELECT id, vault FROM users ORDER BY vault DESC LIMIT 10').all();
+            embed.setTitle('💰 Wealth Leaderboard (Vault)');
+            leaderboardList = await Promise.all(topUsers.map(async (u, index) => {
+                let username = 'Unknown';
+                try { const discordUser = await client.users.fetch(u.id); username = discordUser.username; } catch (e) { username = `User(${u.id.substring(0, 5)}...)`; }
+                return `${index + 1}. **${username}** - 🏦 ${u.vault.toLocaleString()}`;
+            }));
+        } else if (type === 'business') {
+            const topBiz = db.prepare('SELECT user_id, COUNT(*) as count FROM businesses GROUP BY user_id ORDER BY count DESC LIMIT 10').all();
+            embed.setTitle('🏢 Business Mogul Leaderboard');
+            leaderboardList = await Promise.all(topBiz.map(async (u, index) => {
+                let username = 'Unknown';
+                try { const discordUser = await client.users.fetch(u.user_id); username = discordUser.username; } catch (e) { username = `User(${u.user_id.substring(0, 5)}...)`; }
+                return `${index + 1}. **${username}** - ${u.count} businesses`;
+            }));
+        } else if (type === 'faction') {
+            const topFactions = db.prepare('SELECT name, vault FROM factions ORDER BY vault DESC LIMIT 10').all();
+            embed.setTitle('🚩 Richest Factions Leaderboard');
+            leaderboardList = topFactions.map((f, index) => `${index + 1}. **${f.name}** - 🏦 ${f.vault.toLocaleString()}`);
+        }
 
-        embed.setDescription(leaderboardList.join('\n') || 'No players yet.');
+        embed.setDescription(leaderboardList.join('\n') || 'No data yet.');
         await interaction.editReply({ embeds: [embed] });
     }
 
@@ -605,7 +671,7 @@ client.on('interactionCreate', async interaction => {
                 .setTitle('🛡️ VaultQuest: Survival Guide')
                 .setDescription('Welcome to VaultQuest, a game of risk, strategy, and wealth.')
                 .addFields(
-                    { name: '💰 Economy', value: '`/balance`, `/work`, `/daily`, `/give`, `/leaderboard`' },
+                    { name: '💰 Economy', value: '`/balance`, `/profile`, `/work`, `/daily`, `/give`, `/leaderboard`' },
                     { name: '🏦 Vaults & Upgrades', value: '`/vault`, `/upgrade capacity/security`' },
                     { name: '🚨 Heists & Items', value: '`/heist`, `/shop`, `/inventory`' },
                     { name: '🏢 Businesses', value: '`/business buy/collect/sabotage`' },
