@@ -1,6 +1,10 @@
 require('dotenv').config();
+console.log(`--- SECRET DEBUG LOG 123 (PID: ${process.pid}) ---`);
+console.log('🚀 Starting bot...');
 const { Client, GatewayIntentBits, Collection, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
-const { getUser, db, transaction } = require('./database');
+console.log('📦 Loading database module...');
+const { getUser, db, transaction } = require('./db_manager');
+console.log('✅ Database module loaded successfully.');
 const { formatTime, calculateSuccess } = require('./utils');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -780,7 +784,7 @@ client.on('interactionCreate', async interaction => {
     }
    });
 
-client.once('ready', () => {
+client.once('clientReady', () => {
     console.log(`✅ Logged in as ${client.user.tag}!`);
     console.log('🤖 Bot is online and ready to serve.');
 });
