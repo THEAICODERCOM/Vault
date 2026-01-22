@@ -1,10 +1,7 @@
 require('dotenv').config();
-console.log(`--- SECRET DEBUG LOG 123 (PID: ${process.pid}) ---`);
-console.log('🚀 Starting bot...');
+console.log('🚀 Starting VaultQuest Bot...');
 const { Client, GatewayIntentBits, Collection, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
-console.log('📦 Loading database module...');
-const { getUser, db, transaction } = require('./db_manager');
-console.log('✅ Database module loaded successfully.');
+const { getUser, db, transaction } = require('./database');
 const { formatTime, calculateSuccess } = require('./utils');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
