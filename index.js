@@ -305,11 +305,21 @@ client.on('interactionCreate', async interaction => {
     }
 
     if (interaction.commandName === 'heist') {
+        const now = Date.now();
+        const cooldown = 10 * 60 * 1000; // 10 minutes
+        if (now - user.last_heist < cooldown) {
+            const remaining = cooldown - (now - user.last_heist);
+            return interaction.reply({ content: `You're still laying low! You can heist again in ${formatTime(remaining)}.`, ephemeral: true });
+        }
+
         const targetUser = interaction.options.getUser('user');
         if (targetUser.id === interaction.user.id) return interaction.reply({ content: "Robbing yourself? Really?", ephemeral: true });
 
         const target = getUser(targetUser.id);
         if (target.vault <= 0) return interaction.reply({ content: "That person has nothing in their vault. Not worth it.", ephemeral: true });
+
+        // Update last_heist time
+        db.prepare('UPDATE users SET last_heist = ? WHERE id = ?').run(now, user.id);
 
         // 1. Check for Vault Shield
         const shield = db.prepare('SELECT * FROM inventory WHERE user_id = ? AND item_id = ? LIMIT 1').get(target.id, 'shield');
