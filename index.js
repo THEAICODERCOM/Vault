@@ -4,6 +4,20 @@ const { Client, GatewayIntentBits, Collection, REST, Routes, SlashCommandBuilder
 console.log('🔍 Debug: About to require ./database');
 const { getUser, db, transaction } = require('./database');
 console.log('🔍 Debug: Successfully required ./database');
+
+// NUCLEAR MIGRATION: Force check last_heist column right here
+try {
+    const tableInfo = db.prepare("PRAGMA table_info(users)").all();
+    if (!tableInfo.some(col => col.name === 'last_heist')) {
+        db.prepare('ALTER TABLE users ADD COLUMN last_heist INTEGER DEFAULT 0').run();
+        console.log('☢️ NUCLEAR MIGRATION: Added last_heist column successfully!');
+    } else {
+        console.log('✅ Nuclear check: last_heist exists.');
+    }
+} catch (e) {
+    console.error('❌ Nuclear migration failed:', e);
+}
+
 const { formatTime, calculateSuccess } = require('./utils');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -135,15 +149,19 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 client.on('interactionCreate', async interaction => {
     try {
         if (interaction.isAutocomplete()) {
-            if (interaction.commandName === 'leaderboard') {
-                const focusedValue = interaction.options.getFocused();
-                const choices = [
-                    { name: '💰 Wealth (Vault)', value: 'money' },
-                    { name: '🏢 Businesses Owned', value: 'business' },
-                    { name: '🚩 Faction Wealth', value: 'faction' }
-                ];
-                const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
-                await interaction.respond(filtered);
+            try {
+                if (interaction.commandName === 'leaderboard') {
+                    const focusedValue = interaction.options.getFocused();
+                    const choices = [
+                        { name: '💰 Wealth (Vault)', value: 'money' },
+                        { name: '🏢 Businesses Owned', value: 'business' },
+                        { name: '🚩 Faction Wealth', value: 'faction' }
+                    ];
+                    const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
+                    await interaction.respond(filtered);
+                }
+            } catch (error) {
+                console.error('❌ Autocomplete Error:', error);
             }
             return;
         }
@@ -656,7 +674,6 @@ client.on('interactionCreate', async interaction => {
        }
 
     if (interaction.commandName === 'leaderboard') {
-        await interaction.deferReply();
         const type = interaction.options.getString('type');
         const embed = new EmbedBuilder().setColor('Gold');
         let leaderboardList = [];
@@ -709,10 +726,12 @@ client.on('interactionCreate', async interaction => {
         const errorMsg = { content: '⚠️ An error occurred while processing this command. The database might be busy, please try again in a moment.', ephemeral: true };
         
         try {
-            if (interaction.deferred || interaction.replied) {
-                await interaction.editReply(errorMsg);
-            } else {
-                await interaction.reply(errorMsg);
+            if (interaction.isRepliable()) {
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply(errorMsg);
+                } else {
+                    await interaction.reply(errorMsg);
+                }
             }
         } catch (e) {
             console.error('Failed to send error response:', e);
