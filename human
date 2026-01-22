@@ -1,0 +1,60 @@
+vaultquest notes -- braindump
+
+k so the name is VaultQuest. basically making a discord eco bot but not a boring one where u just spam /work all day. i want some actual strategy. 
+
+hosting n stuff
+- probably gonna go with oracle cloud ARM for production since its free and has like 24gb ram lol. overkill but whatever. 
+- dev on our own machines is fine. 
+- MUST use a private github repo. i dont want to leak the token like a complete idiot. 
+
+the stack
+- nodejs + discord.js (standard)
+- better-sqlite3. i hate async/await for simple math so sync is way better for balances n stuff. plus its fast.
+
+gameplay bits
+factions are a big thing. let people form gangs. 
+- shared vaults: you pool money together. maybe 2% interest? but it makes the gang a target for mega heists. high risk high reward i guess. 
+- taxes: factions can "claim" a channel. if someone runs /work there, the gang takes a 5% cut. ez money.
+
+shops & stuff
+don't just hold coins, that's boring. users buy "shops". 
+- like a coffee shop costs 50k and makes 500/hr. 
+- but people can sabotage you. pay 5k to shut a shop down for 6 hours. 
+- unless u have a "security guard" item to block it. 
+
+vault traps
+this is the fun part. 
+- shock wire: fail a heist = jailed for way longer.
+- ink bombs: failure = name turns red for 24h. everyone will know ur a thief. 
+- false bottom: they think they won but they get 0 coins lol. ultimate troll.
+
+some code things to remember
+- passive income: DONT use a loop. itll kill the cpu. just calculate it when they check. 
+  `const profit = Math.floor((Date.now() - lastClaim) / 3600000) * hourlyRate;`
+- heist math: put it in math.js. 
+  ```javascript
+  const calculateSuccess = (attackerPower, defenderSecurity) => {
+      let chance = 0.40; // base 40%
+      chance += (attackerPower * 0.1);
+      chance -= (defenderSecurity * 0.05);
+      return Math.random() < chance;
+  };
+  ```
+- TRANSACTIONS: always use them for money. if it crashes mid-transfer we're screwed. 
+
+ui/ux
+buttons and menus only. typing commands is so 2018. 
+- for /shop, use a select menu. then interaction.update() with a "confirm" button. 
+
+plan
+w1 - basic eco stuff
+w2 - vaults & heists
+w3 - gangs logic
+w4 - businesses
+w5 - fix bugs & beta test
+
+oh and we need a /daily. just store a timestamp in sqlite and compare with Date.now(). 
+maybe a /bounty system too? 
+inventory should probably use a select menu to "equip" or "use" stuff. durability would be cool too but maybe later. 
+
+anyway i need more coffee. thats the plan for now.
